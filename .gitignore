@@ -1,0 +1,54 @@
+# Radar ECOBICI CDMX — .gitignore
+# Debe existir ANTES del primer `git add` (lo coloca el Bootstrap del blueprint, §10).
+# Una ruta ya rastreada por git nunca vuelve a ser ignorada: por eso el orden importa.
+
+# --- Secretos y configuración local ---
+.env
+.env.local
+.env.*.local
+!.env.example
+docker/seaweedfs/s3.json
+infra/terraform/terraform.tfvars
+
+# --- Datos (D-006: bronze/silver/gold viven en data/, nunca en git) ---
+data/
+*.parquet
+models/
+chroma/
+
+# --- MLflow ---
+mlruns/
+mlartifacts/
+
+# --- Terraform (el state local NUNCA se sube) ---
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+frontend/.vite/
+
+# --- Sistema operativo / editores ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# NOTA: blueprints/ SÍ se versiona (es el diseño del proyecto).

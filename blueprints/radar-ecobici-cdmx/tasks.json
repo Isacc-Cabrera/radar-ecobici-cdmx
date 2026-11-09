@@ -1,0 +1,634 @@
+[
+  {
+    "id": "E1-T1",
+    "title": "Fundar el repo: licencia, README, arquitectura y bitácora",
+    "epic": "01-ingesta-streaming",
+    "dependencies": [],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `git check-ignore -q .env` runs THE SYSTEM SHALL exit 0, and `git check-ignore -q .env.example` SHALL exit 1 (`.env` ignored, `.env.example` not ignored).",
+      "WHEN `git log --all --name-only --format= -- .env` runs THE SYSTEM SHALL print nothing, proving `.env` was never committed.",
+      "WHEN `docs/bitacora.md` is read THE SYSTEM SHALL contain the decision ids `D-008`, `D-009` and `D-010`.",
+      "WHEN `LICENSE` is read THE SYSTEM SHALL have `MIT License` as its first line and contain `Copyright (c) 2026 Angel Isacc Cabrera Leal`.",
+      "WHEN `docs/arquitectura.md` and `README.md` are read THE SYSTEM SHALL find a line that is exactly three backticks followed by `mermaid` in the former and the lines `## Problema`, `## Objetivo`, `## Arquitectura`, `## Stack` and `## Estado por etapas` in the latter.",
+      "WHEN `docs/metrics.md` is read THE SYSTEM SHALL define `cobertura_heartbeat`, `tasa_regla_capacidad`, `mae_t60` and `mejora_vs_baseline_pct`."
+    ],
+    "verify": [
+      "git check-ignore -q .env",
+      "git check-ignore -q .env.example; test $? -eq 1",
+      "test -z \"$(git log --all --name-only --format= -- .env)\"",
+      "grep -q 'D-008' docs/bitacora.md && grep -q 'D-009' docs/bitacora.md && grep -q 'D-010' docs/bitacora.md",
+      "head -n 1 LICENSE | grep -qx 'MIT License' && grep -qF 'Copyright (c) 2026 Angel Isacc Cabrera Leal' LICENSE",
+      "grep -qx '```mermaid' docs/arquitectura.md",
+      "uv run python -c \"import sys; t = open('README.md', encoding='utf-8').read().splitlines(); sys.exit(0 if all(h in t for h in ['## Problema', '## Objetivo', '## Arquitectura', '## Stack', '## Estado por etapas']) else 1)\"",
+      "uv run python -c \"import sys; t = open('docs/metrics.md', encoding='utf-8').read(); sys.exit(0 if all(m in t for m in ['cobertura_heartbeat', 'tasa_regla_capacidad', 'mae_t60', 'mejora_vs_baseline_pct']) else 1)\""
+    ],
+    "checkpoint": "step-01-fundacion",
+    "files": [
+      "docs/bitacora.md",
+      "LICENSE",
+      "README.md",
+      "docs/arquitectura.md",
+      "docs/metrics.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T2",
+    "title": "Núcleo del recolector: settings, reintentos y hash",
+    "epic": "01-ingesta-streaming",
+    "dependencies": [
+      "E1-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_recolector_nucleo.py` runs THE SYSTEM SHALL exit 0 with 0 failed while every HTTP call is served by respx mocks (no network).",
+      "WHEN discovery reads `tests/fixtures/gbfs.json` with `GBFS_LANG=es` THE SYSTEM SHALL return the `station_status` and `station_information` URLs listed under `data.es.feeds`, and SHALL raise `FeedSchemaError` for a language absent from `data`.",
+      "WHEN the mocked feed answers 503, 503 and then 200 THE SYSTEM SHALL return the 200 payload after exactly 2 waits, each between 0 and `min(300, RETRY_BASE_SECONDS * 2**attempt)` seconds.",
+      "WHEN the mocked feed answers 429 with `Retry-After: 7` THE SYSTEM SHALL wait exactly 7 seconds before the next request.",
+      "WHEN the mocked feed answers 404 THE SYSTEM SHALL make exactly 1 request and raise `FeedClientError` without waiting.",
+      "WHEN two `station_information` payloads differ only in `last_updated` THE SYSTEM SHALL return the same `stations_hash`, a different one when a station's `capacity` changes, and `find_unknown_station_ids` SHALL return `{\"999\"}` for `tests/fixtures/station_status.json`."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_recolector_nucleo.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy"
+    ],
+    "checkpoint": "step-02-recolector-nucleo",
+    "files": [
+      "src/radar/config.py",
+      "src/radar/collector/retry.py",
+      "src/radar/collector/gbfs_client.py",
+      "src/radar/collector/hashing.py",
+      "tests/unit/test_recolector_nucleo.py"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T3",
+    "title": "Recolector en Docker: sinks, heartbeat y loop de 60 s",
+    "epic": "01-ingesta-streaming",
+    "dependencies": [
+      "E1-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_runner.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN a tick receives a `last_updated` already seen THE SYSTEM SHALL append a heartbeat line with `result=\"sin_cambios\"` and write no new bronze file.",
+      "WHEN `last_updated` stays frozen longer than `STALE_ALERT_SECONDS` THE SYSTEM SHALL log a WARNING and append a heartbeat with `result=\"error\"` and `error=\"feed_congelado\"`.",
+      "WHEN the client raises any exception during a tick THE SYSTEM SHALL append a heartbeat with `result=\"error\"` and keep the loop running.",
+      "WHEN `docker compose run --rm -e RUN_ONCE=true collector` runs against the live feed THE SYSTEM SHALL exit 0 and leave at least one `station_status_*.json.gz` under `data/bronze/station_status/dt=*/hour=*/` and at least one `data/bronze/heartbeat/dt=*.jsonl` file.",
+      "WHEN `docker compose up -d collector` runs THE SYSTEM SHALL report the `collector` container running with restart policy `unless-stopped` and user `radar` (not root)."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_runner.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "docker compose build collector",
+      "docker compose run --rm -e RUN_ONCE=true collector",
+      "uv run python -c \"import glob, sys; s = glob.glob('data/bronze/station_status/dt=*/hour=*/station_status_*.json.gz'); h = glob.glob('data/bronze/heartbeat/dt=*.jsonl'); sys.exit(0 if s and h else 1)\"",
+      "docker compose up -d collector",
+      "test \"$(docker inspect -f '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}} {{.Config.User}}' \"$(docker compose ps -q collector)\")\" = 'true unless-stopped radar'"
+    ],
+    "checkpoint": "step-03-recolector-docker",
+    "files": [
+      "src/radar/collector/sinks.py",
+      "src/radar/collector/heartbeat.py",
+      "src/radar/collector/runner.py",
+      "docker/collector.Dockerfile",
+      "tests/unit/test_runner.py"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T4",
+    "title": "Kafka KRaft, topics y productor KafkaSink",
+    "epic": "01-ingesta-streaming",
+    "dependencies": [
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_messages.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN `tests/fixtures/station_status.json` is converted THE SYSTEM SHALL produce 4 station messages keyed by their `station_id`, each value carrying `feed_last_updated` and `snapshot_id` `station_status_1794160800`, plus 1 raw message keyed `station_status` whose value gunzips to the original bytes.",
+      "WHEN `docker compose --profile streaming up -d --wait kafka` runs THE SYSTEM SHALL exit 0 with the broker healthy, and `docker compose --profile streaming config --services` SHALL list `kafka` and no service containing `zookeeper`.",
+      "WHEN `uv run python -m radar.streaming.producer --ensure-topics --check` runs twice THE SYSTEM SHALL exit 0 both times with `station_status` at 3 partitions and `station_status_raw` at 1 partition.",
+      "WHEN `docker compose --profile streaming run --rm -e RUN_ONCE=true collector-kafka` runs against the live feed THE SYSTEM SHALL exit 0 only after every produced message is acknowledged by the broker."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_messages.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "docker compose --profile streaming up -d --wait kafka",
+      "docker compose --profile streaming config --services | uv run python -c \"import sys; s = sys.stdin.read().split(); sys.exit(0 if 'kafka' in s and not any('zookeeper' in x for x in s) else 1)\"",
+      "uv run python -m radar.streaming.producer --ensure-topics --check",
+      "uv run python -m radar.streaming.producer --ensure-topics --check",
+      "docker compose --profile streaming build collector-kafka",
+      "docker compose --profile streaming run --rm -e RUN_ONCE=true collector-kafka"
+    ],
+    "checkpoint": "step-04-kafka-productor",
+    "files": [
+      "src/radar/streaming/messages.py",
+      "src/radar/streaming/producer.py",
+      "src/radar/collector/sinks.py",
+      "tests/unit/test_messages.py"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T5",
+    "title": "Consumidor bronze-writer, demo de recuperación y migración",
+    "epic": "01-ingesta-streaming",
+    "dependencies": [
+      "E1-T4"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_consumer.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN the same raw message is processed twice by `BronzeWriter.process` THE SYSTEM SHALL leave exactly one bronze file and commit the message offset both times.",
+      "WHEN writing the bronze file raises an exception THE SYSTEM SHALL NOT commit that offset.",
+      "WHEN `docker compose --profile streaming run --rm bronze-writer python -m radar.streaming.consumer --exit-when-idle 20 --min-messages 1` runs with the `bronze-writer` service stopped THE SYSTEM SHALL exit 0 after consuming at least 1 message.",
+      "WHEN `DEMO_PAUSE_SECONDS=120 bash scripts/demo_recovery.sh` runs THE SYSTEM SHALL stop the consumer, keep producing, restart it, and exit 0 only if every heartbeat with `sink=\"kafka\"` and `result=\"guardado\"` in the window has its `station_status_<last_updated>.json.gz` in bronze.",
+      "WHEN `docker compose --profile streaming ps --services --status running` runs after the migration THE SYSTEM SHALL list `kafka`, `collector-kafka` and `bronze-writer` and SHALL NOT list `collector`."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_consumer.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "docker compose --profile streaming build bronze-writer",
+      "docker compose --profile streaming stop bronze-writer",
+      "docker compose --profile streaming run --rm bronze-writer python -m radar.streaming.consumer --exit-when-idle 20 --min-messages 1",
+      "DEMO_PAUSE_SECONDS=120 bash scripts/demo_recovery.sh",
+      "docker compose --profile streaming ps --services --status running | uv run python -c \"import sys; s = set(sys.stdin.read().split()); sys.exit(0 if {'kafka', 'collector-kafka', 'bronze-writer'} <= s and 'collector' not in s else 1)\"",
+      "uv run python -c \"import sys; t = open('docs/kafka.md', encoding='utf-8').read(); sys.exit(0 if all(h in t for h in ['## Diseño de mensajes', '## Semántica de entrega', '## Demo de recuperación', '## Migración sin huecos']) else 1)\""
+    ],
+    "checkpoint": "step-05-kafka-consumidor",
+    "files": [
+      "src/radar/streaming/consumer.py",
+      "scripts/demo_recovery.sh",
+      "tests/unit/test_consumer.py",
+      "docs/kafka.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T6",
+    "title": "SeaweedFS: buckets, mínimo privilegio y LakeStore",
+    "epic": "01-ingesta-streaming",
+    "dependencies": [
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_store.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN `make_lake_store` receives backend `local` THE SYSTEM SHALL return a `LocalLakeStore` and for `s3` an `S3LakeStore`, and a second `LocalLakeStore.put_file` with the same key and size SHALL return `omitido`.",
+      "WHEN `uv run python scripts/lake_setup.py render` runs and then `docker compose --profile lake up -d --wait seaweedfs` runs THE SYSTEM SHALL fill any blank `S3_*` key in `.env`, write `docker/seaweedfs/s3.json` with the identities `admin` and `radar-app`, and report the service healthy.",
+      "WHEN `uv run python scripts/lake_setup.py buckets` runs twice THE SYSTEM SHALL exit 0 both times with the buckets `radar-bronze`, `radar-silver` and `radar-gold` present.",
+      "WHEN `uv run python scripts/lake_setup.py check-policy` runs THE SYSTEM SHALL exit 0 only if the `radar-app` identity can put, get and list objects in the three buckets and receives `AccessDenied` on `CreateBucket` and on `DeleteBucket`.",
+      "WHEN `uv run python scripts/sync_lake.py --layer bronze --check-idempotent --json` runs THE SYSTEM SHALL exit 0 only if the second pass re-uploads none of the keys the first pass saw and no uploaded key contains `trips/`."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_store.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run python scripts/lake_setup.py render",
+      "docker compose --profile lake up -d --wait seaweedfs",
+      "uv run python scripts/lake_setup.py buckets",
+      "uv run python scripts/lake_setup.py buckets",
+      "uv run python scripts/lake_setup.py check-policy",
+      "uv run python scripts/sync_lake.py --layer bronze --check-idempotent --json",
+      "git check-ignore -q docker/seaweedfs/s3.json"
+    ],
+    "checkpoint": "step-06-lake-seaweedfs",
+    "files": [
+      "scripts/lake_setup.py",
+      "src/radar/lake/store.py",
+      "scripts/sync_lake.py",
+      "tests/unit/test_store.py"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T1",
+    "title": "Bronze a silver con cadena de calidad y cuarentena",
+    "epic": "02-lake-modelo-api",
+    "dependencies": [
+      "E1-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_quality.py tests/unit/test_bronze_to_silver.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN the fixture snapshot `tests/fixtures/station_status.json` is transformed THE SYSTEM SHALL quarantine station `\"3\"` with `motivo=\"regla_capacidad\"` (5+0+6+0 is not 12) and station `\"999\"` with `motivo=\"estacion_desconocida\"`, and keep stations `\"1\"` and `\"2\"` in silver.",
+      "WHEN two rows share `(station_id, last_reported)` THE SYSTEM SHALL keep exactly one in silver and count the other in `filas_duplicadas` without quarantining it.",
+      "WHEN a row lacks a required field or carries a non-integer count THE SYSTEM SHALL quarantine it with `motivo=\"esquema\"` before any other check runs.",
+      "WHEN `uv run python -m radar.lake.bronze_to_silver --hour auto --check-idempotent --json` runs THE SYSTEM SHALL process the latest hour that ended at least 10 minutes ago twice and exit 0 only if both manifests are identical, `filas_validas` is above 0 and `tasa_regla_capacidad` lies between 0 and 1.",
+      "WHEN `uv run python -m radar.lake.bronze_to_silver --backfill --json` runs THE SYSTEM SHALL process every complete hour that has bronze files and no `_manifest.json`, and exit 0."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_quality.py tests/unit/test_bronze_to_silver.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run python -m radar.lake.bronze_to_silver --hour auto --check-idempotent --json",
+      "uv run python -m radar.lake.bronze_to_silver --backfill --json",
+      "uv run python scripts/sync_lake.py --layer silver --check-idempotent --json"
+    ],
+    "checkpoint": "step-07-silver",
+    "files": [
+      "src/radar/lake/job.py",
+      "src/radar/lake/quality.py",
+      "src/radar/lake/bronze_to_silver.py",
+      "tests/unit/test_quality.py",
+      "tests/unit/test_bronze_to_silver.py"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T2",
+    "title": "Gold horario, viajes históricos, SQL analítico y benchmark",
+    "epic": "02-lake-modelo-api",
+    "dependencies": [
+      "E2-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_gold_trips.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN the station code `\"085\"` is normalized THE SYSTEM SHALL return `\"85\"`, keep `\"266-267\"` unchanged, and count `\"266-267\"` as unmatched against `station_information.short_name`.",
+      "WHEN `uv run python -m radar.lake.trips --download --to-silver --demand --json` runs THE SYSTEM SHALL keep the raw CSV only under `data/bronze/trips/` and write `data/silver/trips/month=*/part-0.parquet` without the columns `Genero_Usuario`, `Edad_Usuario` and `Bici`.",
+      "WHEN `uv run python -m radar.lake.silver_to_gold --day auto --check-idempotent --json` runs THE SYSTEM SHALL build `gold/station_hour` and `gold/features_base` for that UTC day twice and exit 0 only if both manifests are identical and `filas_station_hour` is above 0.",
+      "WHEN `uv run python -m radar.lake.trips --benchmark` runs THE SYSTEM SHALL write `docs/reportes/benchmark_duckdb_pandas.md` with wall-clock seconds and peak memory for DuckDB and for pandas.",
+      "WHEN `uv run python -m radar.lake.silver_to_gold --sql-report sql/analitica.sql --out docs/reportes/analitica.md` runs THE SYSTEM SHALL execute every query in the file, which contains a JOIN, a HAVING clause, an `IN (SELECT` subquery and an `OVER (` window, and exit 0."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_gold_trips.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run python -m radar.lake.trips --probe",
+      "uv run python -m radar.lake.bronze_to_silver --backfill --json",
+      "uv run python -m radar.lake.trips --download --to-silver --demand --json",
+      "uv run python -c \"import glob, sys, pyarrow.parquet as pq; f = glob.glob('data/silver/trips/month=*/part-0.parquet'); sys.exit(0 if f and not set(pq.read_schema(f[0]).names) & {'Genero_Usuario', 'Edad_Usuario', 'Bici'} else 1)\"",
+      "uv run python -m radar.lake.silver_to_gold --day auto --check-idempotent --json",
+      "uv run python -m radar.lake.trips --benchmark && test -s docs/reportes/benchmark_duckdb_pandas.md",
+      "uv run python -m radar.lake.silver_to_gold --sql-report sql/analitica.sql --out docs/reportes/analitica.md",
+      "uv run python -c \"import sys; t = open('sql/analitica.sql', encoding='utf-8').read().upper(); sys.exit(0 if all(k in t for k in ['JOIN', 'HAVING', 'IN (SELECT', 'OVER (']) else 1)\"",
+      "uv run python -c \"import sys; t = open('docs/data-lake.md', encoding='utf-8').read().splitlines(); sys.exit(0 if all(h in t for h in ['## Bronze', '## Silver', '## Gold', '## Seguridad']) else 1)\"",
+      "uv run python scripts/sync_lake.py --layer gold --check-idempotent --json"
+    ],
+    "checkpoint": "step-08-gold-viajes",
+    "files": [
+      "src/radar/lake/silver_to_gold.py",
+      "src/radar/lake/trips.py",
+      "tests/unit/test_gold_trips.py",
+      "sql/analitica.sql",
+      "docs/data-lake.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T3",
+    "title": "Pipeline horario con clima, checks de calidad y Airflow",
+    "epic": "02-lake-modelo-api",
+    "dependencies": [
+      "E2-T2"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `uv run python scripts/run_hourly.py --hour auto --stage todo --json` runs THE SYSTEM SHALL run bronze to silver, Open-Meteo weather for lat 19.4326 / lon -99.1332, silver to gold and the quality checks for the chosen hour, and exit 0.",
+      "WHEN the hour printed by `run_hourly.py --print-auto-hour` (chosen with the default threshold) is checked with `--stage calidad --max-gap-minutes 0` THE SYSTEM SHALL run the `calidad` stage, exit with code 3 and print the failed check name `huecos_heartbeat` (the deliberately failing quality check).",
+      "WHEN the weather stage runs twice THE SYSTEM SHALL leave `data/silver/weather/weather.parquet` with at least one row and unique `ts_utc` values.",
+      "WHEN `docker compose --profile orquestacion up -d --build --wait airflow` runs THE SYSTEM SHALL report Airflow standalone (LocalExecutor, Postgres metadata) healthy on port 8080.",
+      "WHEN `airflow dags list -o json` runs inside the `airflow` container THE SYSTEM SHALL list the DAG ids `horario` and `diario`.",
+      "WHEN `airflow dags test horario` runs inside the container with the logical date printed by `run_hourly.py --print-airflow-logical-date` (the `auto` hour plus 1 h) THE SYSTEM SHALL exit 0."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run python scripts/run_hourly.py --hour auto --stage todo --json",
+      "uv run python scripts/run_hourly.py --hour auto --stage todo --json",
+      "H=\"$(uv run python scripts/run_hourly.py --print-auto-hour)\"; out=\"$(uv run python scripts/run_hourly.py --hour \"$H\" --stage calidad --max-gap-minutes 0 2>&1)\"; rc=$?; test $rc -eq 3 && echo \"$out\" | grep -q huecos_heartbeat",
+      "uv run python -c \"import sys, pyarrow.parquet as pq; t = pq.read_table('data/silver/weather/weather.parquet').column('ts_utc').to_pylist(); sys.exit(0 if t and len(t) == len(set(t)) else 1)\"",
+      "docker compose --profile orquestacion up -d --build --wait airflow",
+      "docker compose --profile orquestacion exec -T airflow airflow dags list -o json | uv run python -c \"import json, sys; ids = {d['dag_id'] for d in json.load(sys.stdin)}; sys.exit(0 if {'horario', 'diario'} <= ids else 1)\"",
+      "uv run python scripts/run_hourly.py --print-airflow-logical-date > data/_verify/hora.txt",
+      "MSYS_NO_PATHCONV=1 docker compose --profile orquestacion exec -T airflow bash -c 'airflow dags test horario \"$(cat /opt/radar/data/_verify/hora.txt)\"'"
+    ],
+    "checkpoint": "step-09-orquestacion",
+    "files": [
+      "src/radar/lake/weather.py",
+      "scripts/run_hourly.py",
+      "dags/horario.py",
+      "dags/diario.py",
+      "docker/airflow.Dockerfile"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T4",
+    "title": "Notebook EDA y features sin fuga de datos",
+    "epic": "02-lake-modelo-api",
+    "dependencies": [
+      "E2-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_features.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN input values at times later than t are altered THE SYSTEM SHALL produce identical feature values at t for `lag_15`, `lag_30`, `lag_60`, `roll_mean_30` and `roll_mean_60`.",
+      "WHEN the training frame is built on the 5-minute grid THE SYSTEM SHALL set `y_t60` to the `bikes_available` value 12 steps later for the same station and drop rows without a target.",
+      "WHEN calendar features are built THE SYSTEM SHALL mark 2026-12-25 with `is_holiday=1` and 2026-11-10 with `is_holiday=0`, computing `hour_local` and `dow` in `America/Mexico_City`.",
+      "WHEN `uv run jupyter nbconvert --to html --execute notebooks/01_eda.ipynb --output-dir data/_verify` runs THE SYSTEM SHALL execute every cell on the real lake and exit 0.",
+      "WHEN `docs/modelo.md` is read THE SYSTEM SHALL contain the sections `## Objetivo`, `## Features` and `## Revisión de fuga de datos`."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_features.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run jupyter nbconvert --to html --execute notebooks/01_eda.ipynb --output-dir data/_verify",
+      "uv run python -c \"import sys; t = open('docs/modelo.md', encoding='utf-8').read().splitlines(); sys.exit(0 if all(h in t for h in ['## Objetivo', '## Features', '## Revisión de fuga de datos']) else 1)\""
+    ],
+    "checkpoint": "step-10-eda-features",
+    "files": [
+      "notebooks/01_eda.ipynb",
+      "src/radar/ml/features.py",
+      "tests/unit/test_features.py",
+      "docs/modelo.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T5",
+    "title": "Entrenar baseline, lineal y LightGBM con MLflow",
+    "epic": "02-lake-modelo-api",
+    "dependencies": [
+      "E2-T4"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_models.py` runs THE SYSTEM SHALL exit 0 with 0 failed, including a check that every fold's validation timestamps are later than all of its training timestamps.",
+      "WHEN `docker compose --profile ml up -d --wait mlflow` runs THE SYSTEM SHALL report MLflow healthy at http://localhost:5000.",
+      "WHEN `uv run python -m radar.ml.train --json` runs THE SYSTEM SHALL exit 0 and print MAE, RMSE and R² for `baseline`, `lineal` and at least 3 `lightgbm_*` configurations.",
+      "WHEN training finishes THE SYSTEM SHALL register a version of `radar-bikes-t60` with alias `champion` in MLflow and write the fallback file `models/champion.joblib`.",
+      "WHEN training finishes THE SYSTEM SHALL write `docs/reportes/comparacion_modelos.md` and `docs/reportes/real_vs_pred.html`, and `docs/modelo.md` SHALL contain `## Comparación de modelos`.",
+      "WHEN `uv run jupyter nbconvert --to html --execute notebooks/01_eda.ipynb --output-dir docs/reportes` runs THE SYSTEM SHALL exit 0 and leave `docs/reportes/01_eda.html`."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_models.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "docker compose --profile ml up -d --wait mlflow",
+      "uv run python -m radar.ml.train --json > data/_verify/train.json",
+      "uv run python -c \"import json, sys; m = json.load(open('data/_verify/train.json', encoding='utf-8'))['modelos']; ok = {'baseline', 'lineal'} <= set(m) and sum(k.startswith('lightgbm_') for k in m) >= 3 and all({'mae', 'rmse', 'r2'} <= set(v) for v in m.values()); sys.exit(0 if ok else 1)\"",
+      "uv run python -c \"import sys, mlflow; mlflow.set_tracking_uri('http://localhost:5000'); v = mlflow.MlflowClient().get_model_version_by_alias('radar-bikes-t60', 'champion'); sys.exit(0 if v.version else 1)\"",
+      "test -s models/champion.joblib && test -s docs/reportes/comparacion_modelos.md && test -s docs/reportes/real_vs_pred.html",
+      "grep -qx '## Comparación de modelos' docs/modelo.md",
+      "uv run jupyter nbconvert --to html --execute notebooks/01_eda.ipynb --output-dir docs/reportes && test -s docs/reportes/01_eda.html"
+    ],
+    "checkpoint": "step-11-modelo-mlflow",
+    "files": [
+      "src/radar/ml/models.py",
+      "src/radar/ml/train.py",
+      "src/radar/ml/evaluate.py",
+      "tests/unit/test_models.py",
+      "docs/modelo.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T6",
+    "title": "API FastAPI con repositorio, DI y modelo cargado una vez",
+    "epic": "02-lake-modelo-api",
+    "dependencies": [
+      "E2-T5"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `uv run pytest tests/integration/test_api.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN `GET /health` is requested THE SYSTEM SHALL return 200 with the fields `status`, `modelo_cargado`, `fuente_modelo` and `segundos_desde_ultimo_dato`.",
+      "WHEN `GET /predict/{station_id}` is requested for an unknown id THE SYSTEM SHALL return 404 with `detail.codigo` equal to `estacion_no_encontrada`.",
+      "WHEN `GET /stations/{station_id}/history?hours=0` is requested THE SYSTEM SHALL return 422.",
+      "WHEN several prediction requests are served THE SYSTEM SHALL have loaded the model exactly once, during the lifespan.",
+      "WHEN a CORS preflight arrives from `http://localhost:5173` THE SYSTEM SHALL answer with `access-control-allow-origin: http://localhost:5173`, and `GET /docs` SHALL return 200 on the real app with real lake data and a non-empty `/stations` list."
+    ],
+    "verify": [
+      "uv run pytest tests/integration/test_api.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run python -c \"import sys; from fastapi.testclient import TestClient; from radar.api.main import app; c = TestClient(app); c.__enter__(); h = c.get('/health'); s = c.get('/stations'); d = c.get('/docs'); c.__exit__(None, None, None); sys.exit(0 if h.status_code == 200 and s.status_code == 200 and len(s.json()) > 0 and d.status_code == 200 else 1)\""
+    ],
+    "checkpoint": "step-12-api",
+    "files": [
+      "src/radar/api/schemas.py",
+      "src/radar/api/repository.py",
+      "src/radar/api/deps.py",
+      "src/radar/api/main.py",
+      "tests/integration/test_api.py"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T1",
+    "title": "CI en GitHub Actions, imagen de la API y runbook",
+    "epic": "03-producto-entrega",
+    "dependencies": [
+      "E2-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `.github/workflows/ci.yml` is read THE SYSTEM SHALL trigger on `push` and `pull_request` and contain `astral-sh/setup-uv@v10`, `0.13.7`, `uv sync --frozen --all-extras --all-groups`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest`, `docker/collector.Dockerfile`, `docker/api.Dockerfile` and `push: false`.",
+      "WHEN the CI commands run locally THE SYSTEM SHALL exit 0 for the sync, lint, format, type, test and both image builds.",
+      "WHEN `docker compose --profile api up -d --build --wait api` runs THE SYSTEM SHALL report `api` healthy and `curl -sf localhost:8000/health` SHALL exit 0.",
+      "WHEN `curl -s -o /dev/null -w '%{http_code}' localhost:8000/docs` runs THE SYSTEM SHALL print `200`.",
+      "WHEN `README.md` is read THE SYSTEM SHALL contain the badge URL `https://github.com/Isacc-Cabrera/radar-ecobici-cdmx/actions/workflows/ci.yml/badge.svg`.",
+      "WHEN `docs/backend.md` and `docs/runbook.md` are read THE SYSTEM SHALL find curl examples for `/health`, `/stations`, `/predict/` and `/anomalies` in the former and `## El recolector se detuvo` and `## Kafka no arranca` in the latter."
+    ],
+    "verify": [
+      "uv run python -c \"import sys; t = open('.github/workflows/ci.yml', encoding='utf-8').read(); k = ['push', 'pull_request', 'astral-sh/setup-uv@v10', '0.13.7', 'uv sync --frozen --all-extras --all-groups', 'uv run ruff check .', 'uv run ruff format --check .', 'uv run mypy', 'uv run pytest', 'docker/collector.Dockerfile', 'docker/api.Dockerfile', 'push: false']; sys.exit(0 if all(x in t for x in k) else 1)\"",
+      "uv sync --frozen --all-extras --all-groups",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run pytest",
+      "docker build -f docker/collector.Dockerfile -t radar-ecobici/collector:local .",
+      "docker build -f docker/api.Dockerfile -t radar-ecobici/api:local .",
+      "docker compose --profile api up -d --build --wait api",
+      "curl -sf localhost:8000/health",
+      "test \"$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/docs)\" = 200",
+      "grep -qF 'https://github.com/Isacc-Cabrera/radar-ecobici-cdmx/actions/workflows/ci.yml/badge.svg' README.md",
+      "uv run python -c \"import sys; b = open('docs/backend.md', encoding='utf-8').read(); r = open('docs/runbook.md', encoding='utf-8').read().splitlines(); ok = all(('curl' in b and p in b) for p in ['/health', '/stations', '/predict/', '/anomalies']) and '## El recolector se detuvo' in r and '## Kafka no arranca' in r; sys.exit(0 if ok else 1)\""
+    ],
+    "checkpoint": "step-13-ci",
+    "files": [
+      ".github/workflows/ci.yml",
+      "docker/api.Dockerfile",
+      "docs/backend.md",
+      "docs/runbook.md",
+      "README.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T2",
+    "title": "Mapa 3D con deck.gl, tema claro/oscuro y panel lateral",
+    "epic": "03-producto-entrega",
+    "dependencies": [
+      "E2-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `npm --prefix frontend install` runs THE SYSTEM SHALL exit 0 and write `frontend/package-lock.json`.",
+      "WHEN `npm --prefix frontend run typecheck` runs THE SYSTEM SHALL exit 0 under strict TypeScript.",
+      "WHEN `npm --prefix frontend run test` runs THE SYSTEM SHALL exit 0, asserting contrast of at least 4.5:1 for every text/background token pair in both themes and the -3/+3 prediction thresholds.",
+      "WHEN `npm --prefix frontend run build` and then `npm --prefix frontend run smoke` run THE SYSTEM SHALL exit 0 with the preview server answering `/` with 200 and the `#root` container.",
+      "WHEN the four new source files are searched THE SYSTEM SHALL find `ColumnLayer` and `FlyToInterpolator` in `StationMap.tsx`, `THEME_STORAGE_KEY`, `prefers-color-scheme`, `prefers-reduced-motion` and `60000` in `hooks.ts`, and no `#RRGGBB` color literal in any of them.",
+      "WHEN `docs/frontend.md` is read THE SYSTEM SHALL contain `## Componentes y estado`, `## Cómo dibuja deck.gl en WebGL`, `## Polling vs WebSocket` and `## Capturas y GIF`."
+    ],
+    "verify": [
+      "npm --prefix frontend install",
+      "npm --prefix frontend run typecheck",
+      "npm --prefix frontend run test",
+      "npm --prefix frontend run build",
+      "npm --prefix frontend run smoke",
+      "uv run python -c \"import re, sys; r = lambda p: open('frontend/src/' + p, encoding='utf-8').read(); m, h = r('components/StationMap.tsx'), r('hooks.ts'); files = [r('App.tsx'), m, r('components/Panel.tsx'), h]; ok = 'ColumnLayer' in m and 'FlyToInterpolator' in m and all(k in h for k in ['THEME_STORAGE_KEY', 'prefers-color-scheme', 'prefers-reduced-motion', '60000']) and not any(re.search(r'#[0-9A-Fa-f]{6}\\b', f) for f in files); sys.exit(0 if ok else 1)\"",
+      "uv run python -c \"import sys; t = open('docs/frontend.md', encoding='utf-8').read().splitlines(); sys.exit(0 if all(h in t for h in ['## Componentes y estado', '## Cómo dibuja deck.gl en WebGL', '## Polling vs WebSocket', '## Capturas y GIF']) else 1)\"",
+      "uv run pytest tests/unit/test_encabezados.py"
+    ],
+    "checkpoint": "step-14-mapa-3d",
+    "files": [
+      "frontend/src/App.tsx",
+      "frontend/src/components/StationMap.tsx",
+      "frontend/src/components/Panel.tsx",
+      "frontend/src/hooks.ts",
+      "docs/frontend.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T3",
+    "title": "Detección de anomalías conectada a la API y al mapa",
+    "epic": "03-producto-entrega",
+    "dependencies": [
+      "E3-T2"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_detectors.py` runs THE SYSTEM SHALL exit 0 with 0 failed.",
+      "WHEN a station's `last_reported` stays unchanged for at least `ANOMALY_FROZEN_MINUTES` THE SYSTEM SHALL flag it with `tipo=\"congelada\"`, and SHALL NOT flag a station whose `last_reported` advanced within that window.",
+      "WHEN a station's bikes deviate from its station-hour mean by an absolute z-score of at least `ANOMALY_ZSCORE` THE SYSTEM SHALL flag it with `tipo=\"zscore\"`, and SHALL skip stations with fewer than 3 historical observations for that hour.",
+      "WHEN `uv run python -m radar.anomalies.detectors --json` runs on the real lake THE SYSTEM SHALL exit 0 and print counts for `congelada`, `zscore` and `isolation_forest` plus their intersection.",
+      "WHEN `GET /anomalies` is requested from the real app THE SYSTEM SHALL return 200 with items carrying `station_id`, `tipo`, `puntaje` and `detalle`, and `GET /stations` SHALL set `anomalia=true` for exactly those station ids.",
+      "WHEN `npm --prefix frontend run typecheck` and `npm --prefix frontend run build` run THE SYSTEM SHALL exit 0 with `StationMap.tsx` using `ANOMALY_COLOR`, and `docs/anomalias.md` SHALL contain `## Falsos positivos` and `## Falsos negativos`."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_detectors.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "uv run python -m radar.anomalies.detectors --json",
+      "uv run python -c \"import sys; from fastapi.testclient import TestClient; from radar.api.main import app; c = TestClient(app); c.__enter__(); a = c.get('/anomalies'); s = c.get('/stations'); c.__exit__(None, None, None); ok = a.status_code == 200 and s.status_code == 200 and all({'station_id', 'tipo', 'puntaje', 'detalle'} <= set(x) for x in a.json()) and {x['station_id'] for x in a.json()} == {x['station_id'] for x in s.json() if x['anomalia']}; sys.exit(0 if ok else 1)\"",
+      "npm --prefix frontend run typecheck",
+      "npm --prefix frontend run build",
+      "grep -q 'ANOMALY_COLOR' frontend/src/components/StationMap.tsx",
+      "grep -qx '## Falsos positivos' docs/anomalias.md && grep -qx '## Falsos negativos' docs/anomalias.md"
+    ],
+    "checkpoint": "step-15-anomalias",
+    "files": [
+      "src/radar/anomalies/detectors.py",
+      "tests/unit/test_detectors.py",
+      "src/radar/api/repository.py",
+      "frontend/src/components/StationMap.tsx",
+      "docs/anomalias.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T4",
+    "title": "Terraform para S3, IAM mínimo y presupuesto de 5 USD",
+    "epic": "03-producto-entrega",
+    "dependencies": [
+      "E2-T2"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `terraform -chdir=infra/terraform fmt -check -recursive` runs THE SYSTEM SHALL exit 0.",
+      "WHEN `terraform -chdir=infra/terraform init -backend=false -input=false` and then `terraform -chdir=infra/terraform validate` run THE SYSTEM SHALL exit 0 with provider `hashicorp/aws` constrained to `~> 6.72`.",
+      "WHEN `infra/terraform/main.tf` is read THE SYSTEM SHALL declare `aws_s3_bucket_versioning`, `aws_s3_bucket_public_access_block`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_iam_user_policy` and `aws_budgets_budget` with `limit_amount = \"5\"`, and SHALL NOT declare `aws_iam_access_key`.",
+      "WHEN `git check-ignore -q infra/terraform/terraform.tfstate` runs THE SYSTEM SHALL exit 0, and `git check-ignore -q infra/terraform/.terraform.lock.hcl` SHALL exit 1.",
+      "WHEN `bash -n scripts/sync_gold_to_s3.sh` runs THE SYSTEM SHALL exit 0, and the script SHALL reference only the local folder `data/gold`.",
+      "WHEN `docs/nube.md` is read THE SYSTEM SHALL contain `## Costos estimados`, `## Cómo aplicar (requiere aprobación)` and `## terraform destroy`."
+    ],
+    "verify": [
+      "terraform -chdir=infra/terraform fmt -check -recursive",
+      "terraform -chdir=infra/terraform init -backend=false -input=false",
+      "terraform -chdir=infra/terraform validate",
+      "uv run python -c \"import sys; t = open('infra/terraform/main.tf', encoding='utf-8').read(); ok = all(k in t for k in ['aws_s3_bucket_versioning', 'aws_s3_bucket_public_access_block', 'aws_s3_bucket_server_side_encryption_configuration', 'aws_iam_user_policy', 'aws_budgets_budget', 'limit_amount = \\\"5\\\"', '~> 6.72']) and 'aws_iam_access_key' not in t; sys.exit(0 if ok else 1)\"",
+      "git check-ignore -q infra/terraform/terraform.tfstate",
+      "git check-ignore -q infra/terraform/.terraform.lock.hcl; test $? -eq 1",
+      "bash -n scripts/sync_gold_to_s3.sh",
+      "uv run python -c \"import re, sys; t = open('scripts/sync_gold_to_s3.sh', encoding='utf-8').read(); sys.exit(0 if 'data/gold' in t and not re.search(r'data/(bronze|silver)', t) else 1)\"",
+      "uv run python -c \"import sys; t = open('docs/nube.md', encoding='utf-8').read().splitlines(); sys.exit(0 if all(h in t for h in ['## Costos estimados', '## Cómo aplicar (requiere aprobación)', '## terraform destroy']) else 1)\"",
+      "uv run pytest tests/unit/test_encabezados.py"
+    ],
+    "checkpoint": "step-16-terraform-aws",
+    "files": [
+      "infra/terraform/main.tf",
+      "infra/terraform/variables.tf",
+      "scripts/sync_gold_to_s3.sh",
+      "docs/nube.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T5",
+    "title": "Asistente RAG local con Ollama y fuentes citadas",
+    "epic": "03-producto-entrega",
+    "dependencies": [
+      "E2-T5"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `uv run pytest tests/unit/test_rag.py` runs THE SYSTEM SHALL exit 0 with 0 failed using a fake embedder, an in-memory chromadb client and a fake LLM.",
+      "WHEN the best retrieved fragment's cosine distance exceeds 0.5 THE SYSTEM SHALL answer `No sé: no encontré evidencia en la documentación del proyecto.` and SHALL make zero LLM calls.",
+      "WHEN evidence exists THE SYSTEM SHALL return an answer plus a `fuentes` list of `ruta#n` ids taken from `docs/`.",
+      "WHEN `ollama list` runs THE SYSTEM SHALL list `llama3.2:3b` and `nomic-embed-text`.",
+      "WHEN `uv run python -m radar.rag.index --json` and then `uv run python -m radar.rag.ask \"¿Cada cuánto se recolecta station_status y por qué?\" --json` run THE SYSTEM SHALL exit 0 and print a non-empty `fuentes` list whose ids all start with `docs/`.",
+      "WHEN `docs/rag.md` is read THE SYSTEM SHALL contain `## Requisitos de RAM` and `## Riesgos y alucinaciones`."
+    ],
+    "verify": [
+      "uv run pytest tests/unit/test_rag.py tests/unit/test_encabezados.py",
+      "uv run ruff check . && uv run ruff format --check . && uv run mypy",
+      "ollama list | uv run python -c \"import sys; t = sys.stdin.read(); sys.exit(0 if 'llama3.2:3b' in t and 'nomic-embed-text' in t else 1)\"",
+      "uv run python -m radar.rag.index --json",
+      "uv run python -m radar.rag.ask \"¿Cada cuánto se recolecta station_status y por qué?\" --json | uv run python -c \"import json, sys; f = json.load(sys.stdin)['fuentes']; sys.exit(0 if f and all(x.startswith('docs/') for x in f) else 1)\"",
+      "grep -qx '## Requisitos de RAM' docs/rag.md && grep -qx '## Riesgos y alucinaciones' docs/rag.md",
+      "git check-ignore -q chroma/x"
+    ],
+    "checkpoint": "step-17-rag",
+    "files": [
+      "src/radar/rag/index.py",
+      "src/radar/rag/ask.py",
+      "tests/unit/test_rag.py",
+      "docs/rag.md"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T6",
+    "title": "Documentación final, guion de video y presentación",
+    "epic": "03-producto-entrega",
+    "dependencies": [
+      "E3-T1",
+      "E3-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `README.md` is read THE SYSTEM SHALL contain the lines `## Demo`, `## Arquitectura`, `## Cómo correrlo en 5 comandos`, `## Resultados del modelo`, `## Retos cubiertos`, `## Trabajo futuro` and `## Licencia`.",
+      "WHEN the `## Cómo correrlo en 5 comandos` section of `README.md` is read THE SYSTEM SHALL contain exactly 5 lines starting with `$ `.",
+      "WHEN `docs/presentacion.md` is read THE SYSTEM SHALL contain exactly 10 headings starting with `## Diapositiva `, numbered 1 to 10 in order.",
+      "WHEN `docs/guion-video.md` is read THE SYSTEM SHALL contain at least one `mm:ss` time mark and no mark later than `01:30`.",
+      "WHEN `docs/documento-tecnico.md` and `docs/manual-usuario.md` are read THE SYSTEM SHALL find `bitacora.md` linked in both, `## Decisiones` in the former and `## Cómo usar el mapa` in the latter.",
+      "WHEN `uv run pytest` and `uv run ruff check .` run on the final tree THE SYSTEM SHALL exit 0."
+    ],
+    "verify": [
+      "uv run python -c \"import sys; t = open('README.md', encoding='utf-8').read().splitlines(); sys.exit(0 if all(h in t for h in ['## Demo', '## Arquitectura', '## Cómo correrlo en 5 comandos', '## Resultados del modelo', '## Retos cubiertos', '## Trabajo futuro', '## Licencia']) else 1)\"",
+      "uv run python -c \"import sys; t = open('README.md', encoding='utf-8').read().split('## Cómo correrlo en 5 comandos', 1)[1].split('\\n## ', 1)[0]; sys.exit(0 if sum(1 for l in t.splitlines() if l.startswith('$ ')) == 5 else 1)\"",
+      "uv run python -c \"import re, sys; h = re.findall(r'^## Diapositiva (\\d+)', open('docs/presentacion.md', encoding='utf-8').read(), re.M); sys.exit(0 if [int(x) for x in h] == list(range(1, 11)) else 1)\"",
+      "uv run python -c \"import re, sys; m = [int(a) * 60 + int(b) for a, b in re.findall(r'\\b(\\d\\d):(\\d\\d)\\b', open('docs/guion-video.md', encoding='utf-8').read())]; sys.exit(0 if m and max(m) <= 90 else 1)\"",
+      "uv run python -c \"import sys; d = open('docs/documento-tecnico.md', encoding='utf-8').read(); u = open('docs/manual-usuario.md', encoding='utf-8').read(); ok = 'bitacora.md' in d and 'bitacora.md' in u and '## Decisiones' in d.splitlines() and '## Cómo usar el mapa' in u.splitlines(); sys.exit(0 if ok else 1)\"",
+      "uv run pytest",
+      "uv run ruff check ."
+    ],
+    "checkpoint": "step-18-documentacion",
+    "files": [
+      "README.md",
+      "docs/documento-tecnico.md",
+      "docs/manual-usuario.md",
+      "docs/guion-video.md",
+      "docs/presentacion.md"
+    ],
+    "status": "pending"
+  }
+]

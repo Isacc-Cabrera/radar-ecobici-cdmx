@@ -1,0 +1,115 @@
+/**
+ * Autor: Isacc Cabrera
+ * Descripción: Tokens del sistema de diseño (paleta verde, tema oscuro y claro). Los componentes
+ *   usan solo var(--token); ningún componente escribe un hex literal.
+ * Patrón: N/A (design tokens)
+ * Fecha de creación: 2026-11-08
+ * Cambios:
+ *     - 2026-11-08 · Isacc Cabrera · Creación desde el blueprint (§7).
+ */
+:root[data-theme="dark"] {
+  --bg: #07120d;
+  --surface: #0e1f17;
+  --surface-2: #14291f;
+  --border: #1f3d2e;
+  --text: #e3f5ea;
+  --text-muted: #8db8a1;
+  --primary: #22c55e;
+  --primary-strong: #16a34a;
+  --primary-fg: #07120d;
+  --accent: #a3e635;
+  --focus: #4ade80;
+  --destructive: #f87171;
+  --anomaly: #ef4444;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f2faf5;
+  --surface: #ffffff;
+  --surface-2: #e7f4ec;
+  --border: #c9e4d3;
+  --text: #0d2a1c;
+  --text-muted: #4a6b5a;
+  --primary: #15803d;
+  --primary-strong: #166534;
+  --primary-fg: #ffffff;
+  --accent: #65a30d;
+  --focus: #16a34a;
+  --destructive: #b91c1c;
+  --anomaly: #ef4444;
+  color-scheme: light;
+}
+
+:root {
+  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.28);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --panel-width: 360px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-2);
+  top: -48px;
+  background: var(--primary);
+  color: var(--primary-fg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  z-index: 10;
+}
+
+.skip-link:focus {
+  top: var(--space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

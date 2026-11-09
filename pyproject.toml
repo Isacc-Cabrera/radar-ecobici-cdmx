@@ -1,0 +1,89 @@
+# Autor: Isacc Cabrera
+# Descripción: Manifiesto del proyecto Python (dependencias fijadas, extras por capa y configuración
+#   de ruff, mypy y pytest). Fuente única de versiones Python; uv.lock es su resolución exacta.
+# Patrón: N/A
+# Fecha de creación: 2026-11-08
+# Cambios:
+#     - 2026-11-08 · Isacc Cabrera · Creación desde el blueprint (versiones verificadas en PyPI).
+
+[project]
+name = "radar-ecobici-cdmx"
+version = "0.1.0"
+description = "Pipeline en tiempo real del feed GBFS de ECOBICI CDMX, predicción t+60 min, API y mapa 3D."
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+authors = [{ name = "Angel Isacc Cabrera Leal" }]
+dependencies = [
+    "httpx==0.28.1",
+    "structlog==26.1.0",
+    "pydantic==2.14.3",
+    "pydantic-settings==2.16.2",
+]
+
+[project.optional-dependencies]
+streaming = ["confluent-kafka==2.16.1"]
+lake = [
+    "boto3==1.43.126",
+    "pyarrow==26.0.1",
+    "duckdb==2.0.0",
+    "polars==2.1.0",
+    "pandas==3.1.1",
+]
+ml = [
+    "scikit-learn==1.9.1",
+    "lightgbm==4.7.0",
+    "mlflow==3.18.0",
+    "plotly==7.1.0",
+    "holidays==0.108",
+    "jupyterlab==4.6.6",
+    "nbconvert==7.17.2",
+]
+api = ["fastapi==0.162.2", "uvicorn==0.54.0"]
+rag = ["chromadb==1.5.9"]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+    "pytest-cov==7.1.0",
+    "respx==0.23.1",
+    "ruff==0.17.4",
+    "mypy==2.4.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+required-version = ">=0.13.0"
+
+[tool.uv.build-backend]
+module-name = "radar"
+module-root = "src"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["blueprints", "frontend", "notebooks", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["radar"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/radar"]
+mypy_path = "src"
+explicit_package_bases = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+exclude = ["^blueprints/", "^frontend/", "^data/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+norecursedirs = ["blueprints", "frontend", "node_modules", ".venv", "data", "notebooks"]

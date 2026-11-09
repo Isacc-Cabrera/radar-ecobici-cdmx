@@ -1,0 +1,21 @@
+# Contexto de build de Docker: solo pyproject.toml, uv.lock, .python-version, src/ y scripts/ importan.
+# Excluir data/ es obligatorio: el lake local pesa GB y contiene datos crudos de viajes (PII).
+blueprints/
+data/
+models/
+mlruns/
+mlartifacts/
+chroma/
+.venv/
+.git/
+.env
+.env.*
+frontend/
+notebooks/
+infra/
+docs/
+tests/
+**/__pycache__/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/

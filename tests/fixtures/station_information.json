@@ -1,0 +1,51 @@
+{
+  "last_updated": 1794160800,
+  "ttl": 10,
+  "version": "2.3",
+  "data": {
+    "stations": [
+      {
+        "station_id": "1",
+        "external_id": "ext-0001",
+        "name": "710 Reforma - Insurgentes",
+        "short_name": "710",
+        "lat": 19.4326,
+        "lon": -99.1617,
+        "rental_methods": ["KEY", "CREDITCARD"],
+        "capacity": 19,
+        "electric_bike_surcharge_waiver": false,
+        "is_charging": false,
+        "eightd_has_key_dispenser": false,
+        "has_kiosk": true
+      },
+      {
+        "station_id": "2",
+        "external_id": "ext-0085",
+        "name": "085 Durango - Salamanca",
+        "short_name": "085",
+        "lat": 19.4192,
+        "lon": -99.1661,
+        "rental_methods": ["KEY", "CREDITCARD"],
+        "capacity": 15,
+        "electric_bike_surcharge_waiver": false,
+        "is_charging": false,
+        "eightd_has_key_dispenser": false,
+        "has_kiosk": true
+      },
+      {
+        "station_id": "3",
+        "external_id": "ext-0311",
+        "name": "311 Amsterdam - Michoacán",
+        "short_name": "311",
+        "lat": 19.4115,
+        "lon": -99.1702,
+        "rental_methods": ["KEY", "CREDITCARD"],
+        "capacity": 12,
+        "electric_bike_surcharge_waiver": false,
+        "is_charging": false,
+        "eightd_has_key_dispenser": false,
+        "has_kiosk": true
+      }
+    ]
+  }
+}

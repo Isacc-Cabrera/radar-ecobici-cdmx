@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Mapa 3D en vivo de las estaciones de ECOBICI CDMX con predicción a 60 minutos." />
+    <title>Radar ECOBICI CDMX</title>
+    <script>
+      // Fija el tema antes del primer pintado (evita el destello): localStorage > prefers-color-scheme.
+      (function () {
+        var tema = null;
+        try { tema = localStorage.getItem("radar-tema"); } catch (e) { tema = null; }
+        if (tema !== "dark" && tema !== "light") {
+          tema = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", tema);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

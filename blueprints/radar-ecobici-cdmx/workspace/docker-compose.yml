@@ -1,0 +1,227 @@
+# Autor: Isacc Cabrera
+# Descripción: Servicios locales de Radar ECOBICI CDMX con perfiles por etapa. Sin perfil arranca
+#   solo el recolector (paso 3). Perfiles: streaming (Kafka KRaft + productor + bronze-writer),
+#   lake (SeaweedFS S3), orquestacion (Airflow + Postgres), ml (MLflow), api (FastAPI).
+#   Regla: nombra siempre el servicio (`docker compose --profile X up -d <servicio>`) para no
+#   reencender por accidente el recolector viejo después de la migración del paso 5.
+# Patrón: N/A (infraestructura declarativa)
+# Fecha de creación: 2026-11-08
+# Cambios:
+#     - 2026-11-08 · Isacc Cabrera · Creación desde el blueprint con imágenes fijadas.
+
+name: radar-ecobici
+
+services:
+  collector:
+    build:
+      context: .
+      dockerfile: docker/collector.Dockerfile
+    image: radar-ecobici/collector:local
+    command: ["python", "-m", "radar.collector.runner"]
+    env_file: [.env]
+    environment:
+      DATA_DIR: /app/data
+      SINK: local
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  kafka:
+    profiles: [streaming]
+    image: apache/kafka:4.4.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9094:9094"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  collector-kafka:
+    profiles: [streaming]
+    build:
+      context: .
+      dockerfile: docker/collector.Dockerfile
+    image: radar-ecobici/collector:local
+    command: ["python", "-m", "radar.collector.runner"]
+    env_file: [.env]
+    environment:
+      DATA_DIR: /app/data
+      SINK: kafka
+      KAFKA_BOOTSTRAP: kafka:9092
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  bronze-writer:
+    profiles: [streaming]
+    build:
+      context: .
+      dockerfile: docker/collector.Dockerfile
+    image: radar-ecobici/collector:local
+    command: ["python", "-m", "radar.streaming.consumer"]
+    env_file: [.env]
+    environment:
+      DATA_DIR: /app/data
+      KAFKA_BOOTSTRAP: kafka:9092
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  seaweedfs:
+    profiles: [lake, orquestacion]
+    image: chrislusf/seaweedfs:4.53
+    command:
+      - server
+      - -dir=/data
+      - -ip.bind=0.0.0.0
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -master.volumeSizeLimitMB=1024
+    ports:
+      - "8333:8333"
+      - "9333:9333"
+    volumes:
+      - seaweed-data:/data
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  postgres-airflow:
+    profiles: [orquestacion]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${POSTGRES_AIRFLOW_PASSWORD:-airflow-local}
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  airflow:
+    profiles: [orquestacion]
+    build:
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+    image: radar-ecobici/airflow:local
+    command: ["standalone"]
+    env_file: [.env]
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${POSTGRES_AIRFLOW_PASSWORD:-airflow-local}@postgres-airflow:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      DATA_DIR: /opt/radar/data
+      S3_ENDPOINT_URL: http://seaweedfs:8333
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./data:/opt/radar/data
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v2/monitor/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  mlflow:
+    profiles: [ml, api]
+    image: ghcr.io/mlflow/mlflow:v3.18.0
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=sqlite:////mlflow/mlflow.db
+      - --artifacts-destination=/mlflow/artifacts
+      - --serve-artifacts
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: "localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,mlflow,mlflow:5000"
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  api:
+    profiles: [api]
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: radar-ecobici/api:local
+    env_file: [.env]
+    environment:
+      DATA_DIR: /app/data
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_FALLBACK_PATH: /app/models/champion.joblib
+    volumes:
+      - ./data:/app/data:ro
+      - ./models:/app/models:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  seaweed-data:
+  airflow-db:
+  mlflow-data:

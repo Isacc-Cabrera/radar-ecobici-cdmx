@@ -1,0 +1,21 @@
+{
+  "last_updated": 1794160800,
+  "ttl": 10,
+  "version": "2.3",
+  "data": {
+    "en": {
+      "feeds": [
+        { "name": "system_information", "url": "https://gbfs.example.test/gbfs/en/system_information.json" },
+        { "name": "station_information", "url": "https://gbfs.example.test/gbfs/en/station_information.json" },
+        { "name": "station_status", "url": "https://gbfs.example.test/gbfs/en/station_status.json" }
+      ]
+    },
+    "es": {
+      "feeds": [
+        { "name": "system_information", "url": "https://gbfs.example.test/gbfs/es/system_information.json" },
+        { "name": "station_information", "url": "https://gbfs.example.test/gbfs/es/station_information.json" },
+        { "name": "station_status", "url": "https://gbfs.example.test/gbfs/es/station_status.json" }
+      ]
+    }
+  }
+}

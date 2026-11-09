@@ -1,0 +1,28 @@
+{
+  "identities": [
+    {
+      "name": "admin",
+      "credentials": [
+        { "accessKey": "EJEMPLO_ADMIN_ACCESS_KEY", "secretKey": "EJEMPLO_ADMIN_SECRET_KEY" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    },
+    {
+      "name": "radar-app",
+      "credentials": [
+        { "accessKey": "EJEMPLO_APP_ACCESS_KEY", "secretKey": "EJEMPLO_APP_SECRET_KEY" }
+      ],
+      "actions": [
+        "Read:radar-bronze",
+        "Write:radar-bronze",
+        "List:radar-bronze",
+        "Read:radar-silver",
+        "Write:radar-silver",
+        "List:radar-silver",
+        "Read:radar-gold",
+        "Write:radar-gold",
+        "List:radar-gold"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+# Finales de línea LF en todo el repo: los scripts .sh y los Dockerfile se ejecutan en Linux
+# (contenedores) aunque el repo viva en Windows; un CRLF rompe `bash` con "$'\r': command not found".
+* text=auto eol=lf
+*.sh text eol=lf
+*.Dockerfile text eol=lf
+*.parquet binary
+*.gz binary
+*.png binary
+*.gif binary
+*.joblib binary
