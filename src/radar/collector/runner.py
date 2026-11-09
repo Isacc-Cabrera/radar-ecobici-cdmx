@@ -9,6 +9,7 @@ Patrón: Dependency Injection (cliente, sink, heartbeat, reloj y sleep se inyect
 Fecha de creación: 2026-11-09
 Cambios:
     - 2026-11-09 · Isacc Cabrera · Creación (paso 3).
+    - 2026-11-09 · Isacc Cabrera · Estado separado por sink (collector_<sink>.json, paso 4).
 """
 
 import json
@@ -43,7 +44,7 @@ class FeedFetcher(Protocol):
 
 @dataclass
 class CollectorState:
-    """Estado persistido en ``data/state/collector.json`` (no es dato crudo).
+    """Estado persistido en ``data/state/collector_<sink>.json`` (no es dato crudo).
 
     Attributes:
         last_status_last_updated: Último ``last_updated`` visto de ``station_status``.
@@ -108,7 +109,9 @@ class CollectorRunner:
         self._clock = clock
         self._sleep = sleep
         self._monotonic = monotonic
-        self._state_path = settings.data_dir / "state" / "collector.json"
+        # un archivo por sink: durante la migración (paso 5) conviven el recolector local y el
+        # de Kafka, y no deben creer que ya publicaron lo que publicó el otro
+        self._state_path = settings.data_dir / "state" / f"collector_{sink.name}.json"
         self.state = CollectorState.load(self._state_path)
         self.known_ids: set[str] = set()
         self._unknown_reported: set[str] = set()

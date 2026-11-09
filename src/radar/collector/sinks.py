@@ -9,6 +9,7 @@ Patrón: Ports & Adapters (SnapshotSink / LocalFileSink) + Factory (make_sink)
 Fecha de creación: 2026-11-09
 Cambios:
     - 2026-11-09 · Isacc Cabrera · Creación con LocalFileSink (paso 3).
+    - 2026-11-09 · Isacc Cabrera · make_sink agrega la rama "kafka" (KafkaSink, paso 4).
 """
 
 import gzip
@@ -152,4 +153,9 @@ def make_sink(settings: Settings) -> SnapshotSink:
     """
     if settings.sink == "local":
         return LocalFileSink(settings.data_dir)
+    if settings.sink == "kafka":
+        # import diferido: el recolector local no necesita cargar confluent-kafka
+        from radar.streaming.producer import KafkaSink
+
+        return KafkaSink(settings)
     raise ValueError(f"SINK desconocido: {settings.sink!r}")

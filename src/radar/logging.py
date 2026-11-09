@@ -6,6 +6,8 @@ Patrón: Singleton (configuración global idempotente del logger)
 Fecha de creación: 2026-11-08
 Cambios:
     - 2026-11-08 · Isacc Cabrera · Creación desde el blueprint.
+    - 2026-11-09 · Isacc Cabrera · get_logger perezoso: respeta configure_logging aunque el
+      módulo se importe antes (paso 4).
 """
 
 import logging
@@ -49,6 +51,7 @@ def get_logger(name: str) -> Any:
         name: Nombre lógico del módulo que registra (normalmente ``__name__``).
 
     Returns:
-        Un logger de structlog con el campo ``logger`` fijado.
+        Un logger de structlog con el campo ``modulo`` fijado.
     """
-    return structlog.get_logger().bind(logger=name)
+    # sin .bind(): bind() resolvería la configuración en el import, antes de configure_logging
+    return structlog.get_logger(modulo=name)
