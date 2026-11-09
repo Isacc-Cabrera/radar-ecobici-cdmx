@@ -8,6 +8,8 @@ Cambios:
     - 2026-11-08 · Isacc Cabrera · Creación desde el blueprint.
     - 2026-11-09 · Isacc Cabrera · get_logger perezoso: respeta configure_logging aunque el
       módulo se importe antes (paso 4).
+    - 2026-11-09 · Isacc Cabrera · Escribe en el sys.stderr vigente en cada línea (no el del
+      momento de configurar): capturar stderr en pruebas ya no rompe logs posteriores (paso 7).
 """
 
 import logging
@@ -17,6 +19,18 @@ from typing import Any
 import structlog
 
 _state = {"configured": False}
+
+
+class _CurrentStderr:
+    """Archivo que siempre escribe en el ``sys.stderr`` actual."""
+
+    def write(self, text: str) -> int:
+        """Escribe en el stderr vigente."""
+        return sys.stderr.write(text)
+
+    def flush(self) -> None:
+        """Vacía el stderr vigente."""
+        sys.stderr.flush()
 
 
 def configure_logging(level: str = "INFO") -> None:
@@ -38,7 +52,7 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(numeric_level),
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+        logger_factory=structlog.PrintLoggerFactory(file=_CurrentStderr()),  # type: ignore[arg-type]
         cache_logger_on_first_use=True,
     )
     _state["configured"] = True
