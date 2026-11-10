@@ -14,7 +14,7 @@ Patrón: Repository
 Fecha de creación: 2026-11-10
 Cambios:
     - 2026-11-10 · Isacc Cabrera · Creación (paso 12).
-    - 2026-11-11 · Isacc Cabrera · anomalies() con los tres detectores y caché de 60 s (paso 15).
+    - 2026-11-10 · Isacc Cabrera · anomalies() con los tres detectores y caché de 60 s (paso 15).
 """
 
 import re

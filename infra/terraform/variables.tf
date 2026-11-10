@@ -2,9 +2,9 @@
 # Descripción: Variables de la infraestructura AWS de Radar ECOBICI. Los valores reales van en
 #   infra/terraform/terraform.tfvars, que está ignorado por git (el correo es dato personal).
 # Patrón: N/A (infraestructura declarativa)
-# Fecha de creación: 2026-11-12
+# Fecha de creación: 2026-11-10
 # Cambios:
-#     - 2026-11-12 · Isacc Cabrera · Creación (paso 16).
+#     - 2026-11-10 · Isacc Cabrera · Creación (paso 16).
 
 variable "region" {
   description = "Región de AWS donde vive el bucket de gold."

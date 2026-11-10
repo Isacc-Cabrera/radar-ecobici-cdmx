@@ -6,9 +6,9 @@
  *   el layout responsivo (panel lateral de var(--panel-width) desde 768 px, hoja inferior en
  *   pantallas angostas); los estilos usan solo var(--token).
  * Patrón: Container/Presentational (contenedor)
- * Fecha de creación: 2026-11-11
+ * Fecha de creación: 2026-11-10
  * Cambios:
- *     - 2026-11-11 · Isacc Cabrera · Creación (paso 14).
+ *     - 2026-11-10 · Isacc Cabrera · Creación (paso 14).
  */
 import { useCallback, useMemo, useState } from "react";
 import Panel from "./components/Panel";

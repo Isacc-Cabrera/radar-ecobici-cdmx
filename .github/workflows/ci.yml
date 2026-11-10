@@ -4,10 +4,10 @@
 #   construye las imágenes del recolector y de la API sin publicarlas (job docker, push: false).
 #   Sin secretos ni red hacia AWS: las pruebas usan fixtures, respx y fakes, nunca data/.
 # Patrón: N/A (pipeline declarativo)
-# Fecha de creación: 2026-11-11
+# Fecha de creación: 2026-11-10
 # Cambios:
-#     - 2026-11-11 · Isacc Cabrera · Creación (paso 13).
-#     - 2026-11-11 · Isacc Cabrera · setup-uv fijado a v10.3.3 (no existe la etiqueta v10).
+#     - 2026-11-10 · Isacc Cabrera · Creación (paso 13).
+#     - 2026-11-10 · Isacc Cabrera · setup-uv fijado a v10.3.3 (no existe la etiqueta v10).
 name: CI
 
 on: [push, pull_request]

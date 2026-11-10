@@ -7,9 +7,9 @@ Descripción: Pruebas del paso 17 sin red ni Ollama: EmbedderFalso determinista 
     respuesta con fuentes cuando hay evidencia, la segunda barrera cuando el LLM dice "No sé" y
     los adaptadores de Ollama con respx.
 Patrón: N/A (pruebas)
-Fecha de creación: 2026-11-12
+Fecha de creación: 2026-11-10
 Cambios:
-    - 2026-11-12 · Isacc Cabrera · Creación (paso 17).
+    - 2026-11-10 · Isacc Cabrera · Creación (paso 17).
 """
 
 import hashlib

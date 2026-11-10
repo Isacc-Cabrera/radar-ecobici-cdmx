@@ -11,9 +11,9 @@ Descripción: Asistente RAG que responde preguntas sobre la documentación del p
     preguntas fuera de tema: con nomic-embed-text una ajena queda alrededor de 0.37).
     CLI: python -m radar.rag.ask "<pregunta>" [--json] [-k 4].
 Patrón: Ports & Adapters (Llm y Embedder son puertos; Ollama, los adaptadores)
-Fecha de creación: 2026-11-12
+Fecha de creación: 2026-11-10
 Cambios:
-    - 2026-11-12 · Isacc Cabrera · Creación (paso 17).
+    - 2026-11-10 · Isacc Cabrera · Creación (paso 17).
 """
 
 import argparse

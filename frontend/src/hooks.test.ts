@@ -4,9 +4,9 @@
  *   constantes de polling: cada estación conserva sus datos, recibe su predicción por
  *   station_id y queda con prediccion = null si la API no la trajo (p. ej. 503 sin modelo).
  * Patrón: N/A (pruebas unitarias)
- * Fecha de creación: 2026-11-11
+ * Fecha de creación: 2026-11-10
  * Cambios:
- *     - 2026-11-11 · Isacc Cabrera · Creación (paso 14).
+ *     - 2026-11-10 · Isacc Cabrera · Creación (paso 14).
  */
 import { describe, expect, it } from "vitest";
 import { HISTORY_HOURS, POLL_MS, type PredictionOut, type StationOut, mergeStations } from "./hooks";

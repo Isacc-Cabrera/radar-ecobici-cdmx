@@ -13,9 +13,9 @@ Descripción: Detectores de anomalías por estación con una interfaz común (An
     La historia excluye la última hora para no comparar el presente consigo mismo.
     CLI: python -m radar.anomalies.detectors --json (conteos por detector e intersecciones).
 Patrón: Strategy (detectores intercambiables con la misma interfaz)
-Fecha de creación: 2026-11-11
+Fecha de creación: 2026-11-10
 Cambios:
-    - 2026-11-11 · Isacc Cabrera · Creación (paso 15).
+    - 2026-11-10 · Isacc Cabrera · Creación (paso 15).
 """
 
 import argparse

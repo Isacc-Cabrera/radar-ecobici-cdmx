@@ -6,10 +6,10 @@
  *   bicis de las últimas 6 h (recharts) y la atribución del mapa base. Estados de carga, vacío y
  *   error en texto. Solo recibe props; los colores salen de scales.ts o de var(--token).
  * Patrón: Container/Presentational (presentacional)
- * Fecha de creación: 2026-11-11
+ * Fecha de creación: 2026-11-10
  * Cambios:
- *     - 2026-11-11 · Isacc Cabrera · Creación (paso 14).
- *     - 2026-11-11 · Isacc Cabrera · "⚠ Anomalía" en la leyenda, la lista y el detalle (paso 15).
+ *     - 2026-11-10 · Isacc Cabrera · Creación (paso 14).
+ *     - 2026-11-10 · Isacc Cabrera · "⚠ Anomalía" en la leyenda, la lista y el detalle (paso 15).
  */
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";

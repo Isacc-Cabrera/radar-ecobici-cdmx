@@ -7,9 +7,9 @@
  *   con prefers-color-scheme, y lo persiste. useReducedMotion respeta prefers-reduced-motion.
  *   Tipos iguales al contrato de la API (blueprint §5).
  * Patrón: Custom Hook
- * Fecha de creación: 2026-11-11
+ * Fecha de creación: 2026-11-10
  * Cambios:
- *     - 2026-11-11 · Isacc Cabrera · Creación (paso 14).
+ *     - 2026-11-10 · Isacc Cabrera · Creación (paso 14).
  */
 import { useCallback, useEffect, useState } from "react";
 import { THEME_STORAGE_KEY, type PredictionClass, type Theme, resolveTheme } from "./lib/scales";

@@ -7,9 +7,9 @@ Descripción: Pruebas del paso 15 sobre datos sintéticos: el detector de congel
     para la historia y no corre sin historia suficiente; run_all/summarize juntan e intersecan;
     y el CLI corre sobre un lake mínimo.
 Patrón: N/A (pruebas)
-Fecha de creación: 2026-11-11
+Fecha de creación: 2026-11-10
 Cambios:
-    - 2026-11-11 · Isacc Cabrera · Creación (paso 15).
+    - 2026-11-10 · Isacc Cabrera · Creación (paso 15).
 """
 
 import json

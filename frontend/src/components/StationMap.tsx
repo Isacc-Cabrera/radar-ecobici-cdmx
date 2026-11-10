@@ -9,10 +9,10 @@
  *   Las estaciones con anomalía llevan un anillo ANOMALY_COLOR en la base (ScatterplotLayer) y
  *   "⚠ Anomalía" en el tooltip (texto, no solo color).
  * Patrón: Container/Presentational (presentacional)
- * Fecha de creación: 2026-11-11
+ * Fecha de creación: 2026-11-10
  * Cambios:
- *     - 2026-11-11 · Isacc Cabrera · Creación (paso 14).
- *     - 2026-11-11 · Isacc Cabrera · Anillo y tooltip de anomalías (paso 15).
+ *     - 2026-11-10 · Isacc Cabrera · Creación (paso 14).
+ *     - 2026-11-10 · Isacc Cabrera · Anillo y tooltip de anomalías (paso 15).
  */
 import { FlyToInterpolator, type MapViewState, type PickingInfo } from "@deck.gl/core";
 import { ColumnLayer, ScatterplotLayer } from "@deck.gl/layers";

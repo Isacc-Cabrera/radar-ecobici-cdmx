@@ -67,7 +67,7 @@ Vuelve a indexar cada vez que cambie la documentación. Configuración en `.env`
 `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBED_MODEL`. Salida `--json`:
 `{"respuesta", "fuentes": ["docs/...#n"], "distancia_min"}`.
 
-Ejemplo real (12 de noviembre de 2026):
+Ejemplo real (10 de noviembre de 2026):
 
 > **¿Cada cuánto se recolecta station_status y por qué?** — "Se recolecta `station_status` cada
 > 60 s. Esto se debe a que el modelo predice la próxima hora y no necesita resolución de 10 s, lo

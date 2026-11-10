@@ -11,9 +11,9 @@ Descripción: Indexador del asistente RAG. Trocea docs/*.md y docs/reportes/*.md
     (al preguntar): los pone el adaptador, el puerto no cambia.
     CLI: python -m radar.rag.index [--json] → {"fragmentos": n, "archivos": m}.
 Patrón: Ports & Adapters (Embedder es el puerto; OllamaEmbedder, el adaptador)
-Fecha de creación: 2026-11-12
+Fecha de creación: 2026-11-10
 Cambios:
-    - 2026-11-12 · Isacc Cabrera · Creación (paso 17).
+    - 2026-11-10 · Isacc Cabrera · Creación (paso 17).
 """
 
 import argparse

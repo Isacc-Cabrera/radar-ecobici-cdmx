@@ -5,9 +5,9 @@
 #   No declara la llave de acceso del usuario: quedaría en texto plano en el state; se crea a
 #   mano después de aplicar (docs/nube.md). Nunca terraform apply sin la aprobación explícita del usuario.
 # Patrón: N/A (infraestructura declarativa)
-# Fecha de creación: 2026-11-12
+# Fecha de creación: 2026-11-10
 # Cambios:
-#     - 2026-11-12 · Isacc Cabrera · Creación (paso 16).
+#     - 2026-11-10 · Isacc Cabrera · Creación (paso 16).
 
 terraform {
   required_version = "~> 1.17"
