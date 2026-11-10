@@ -13,7 +13,8 @@ histórica de viajes.
   huecos (horas sin recolector) y 12 filas después podrían ser horas después. Si ese punto no
   existe, la fila se descarta.
 - **Línea base a vencer:** la persistencia ("dentro de una hora habrá lo mismo que ahora"), con
-  MAE ≈ 3.06 bicis sobre las 65,665 filas disponibles el 10 de noviembre de 2026.
+  MAE ≈ 3.06 bicis sobre las 65,665 filas del EDA y 3.02 en la validación temporal del
+  entrenamiento (ver Comparación de modelos).
 - **Código:** `src/radar/ml/features.py`. `build_training_frame(base, weather, demand)` arma el
   marco de entrenamiento y `build_inference_frame(base_recent, weather, demand, now_utc)` devuelve
   la última fila de cada estación. Ambos usan la misma lista `FEATURES`.
@@ -73,3 +74,67 @@ Riesgos que quedan y cómo se manejan:
 - **Validación aleatoria.** Separar filas al azar mezcla minutos vecinos entre entrenamiento y
   prueba. La validación es siempre temporal (`TimeSeriesSplit`): se entrena con el pasado y se
   evalúa con lo posterior.
+
+## Comparación de modelos
+
+`uv run python -m radar.ml.train --json` (10 de noviembre de 2026). Datos: 47,390 filas de 677
+estaciones en **8 horas con cobertura completa del recolector** (de 12 en gold); se excluyeron
+las horas con huecos de más de 10 minutos en el heartbeat (20 UTC del 9; 04, 12 y 14 UTC del 10).
+Validación temporal con 4 folds expandibles y **purga**: una fila cuyo target (`t + 60 min`) cae
+en el periodo de validación no se usa para entrenar. Métricas = promedio de los folds. Reporte
+completo: `docs/reportes/comparacion_modelos.md`; gráfica: `docs/reportes/real_vs_pred.html`.
+
+| Modelo | MAE | RMSE | R² | MAE entrenamiento | Brecha de sobreajuste |
+|---|---|---|---|---|---|
+| baseline (persistencia) | 3.018 | 4.950 | 0.510 | 2.982 | 1.2 % |
+| baseline_semana | no disponible | | | | menos de 7 días de historia |
+| lineal | 3.154 | 4.839 | 0.560 | 2.671 | 15.3 % |
+| **lightgbm_a (ganador)** | **2.848** | **4.562** | **0.597** | 2.037 | 28.5 % |
+| lightgbm_b | 2.931 | 4.662 | 0.582 | 1.767 | 39.7 % |
+| lightgbm_c | 2.990 | 4.693 | 0.578 | 1.379 | 53.9 % |
+
+**El ganador, `lightgbm_a`, mejora el MAE del baseline en 5.6 %** (2.848 contra 3.018 bicis) y
+gana en 3 de los 4 folds; en el último (validación desde la 01:50 UTC, de madrugada, cuando casi
+nada se mueve) la persistencia es mejor (2.671 contra 2.762). Está registrado en MLflow como
+`radar-bikes-t60` con alias `champion`, con respaldo en `models/champion.joblib`.
+
+Lo que hizo la diferencia: **LightGBM aprende el cambio** (`y_t60 − bikes_available`) y no el
+nivel. Aprendiendo el nivel, `lightgbm_a` daba MAE 3.033 y no vencía a la persistencia; los
+árboles tenían que reconstruir "lo mismo que ahora" por tramos. Aprendiendo el cambio, "no
+cambia" es el punto de partida y los árboles solo corrigen. Para la regresión lineal da igual
+(`bikes_available` ya es una feature: el modelo es el mismo), y por eso queda detrás: una recta
+no captura que una estación vacía no puede perder bicis ni una llena ganarlas.
+
+## Sobreajuste
+
+La brecha es `100 · (MAE validación − MAE entrenamiento) / MAE validación`.
+
+- El baseline casi no tiene brecha (1.2 %): no aprende nada, no puede memorizar.
+- En LightGBM la brecha crece con la complejidad: 28.5 % (15 hojas), 39.7 % (31) y 53.9 % (63
+  hojas, 800 árboles). Al mismo tiempo **el MAE de validación empeora** (2.848 → 2.931 → 2.990):
+  las configuraciones grandes memorizan la tarde del 9 de noviembre en vez de aprender patrones.
+- Con 8 horas de datos gana la configuración más simple. Con más días, una más compleja podría
+  ganar: es lo primero que hay que volver a medir.
+
+## Limitaciones
+
+- **Pocos datos.** 8 horas útiles de una sola tarde-noche (lunes 9 y madrugada del martes 10): el
+  modelo no ha visto una mañana completa, un fin de semana ni la hora pico de las 8 h. `dow`,
+  `is_weekend` e `is_holiday` son prácticamente constantes en el entrenamiento y no pueden
+  aportar todavía. `baseline_semana` no se puede evaluar (requiere 7 días).
+- **Sin rebalanceo.** El camión que redistribuye bicis entre estaciones no aparece en ningún dato;
+  esos saltos son imposibles de predecir y elevan el error en las estaciones grandes.
+- **Clima observado.** Se entrena con el clima observado y en vivo se usaría el de la hora actual
+  (posiblemente todavía pronóstico); con 8 horas y casi sin lluvia, el clima apenas varía.
+- **Demanda de otro periodo.** Viene de octubre; si el patrón de noviembre cambia (vacaciones,
+  eventos), la feature se desalinea.
+- **Horas excluidas.** El modelo solo se evalúa en horas con el recolector completo; en vivo, si
+  el recolector se detiene, las features de lag se vuelven viejas y la predicción empeora.
+
+## Exportar el notebook
+
+- **HTML** (lo que se entrega y se versiona):
+  `uv run jupyter nbconvert --to html --execute notebooks/01_eda.ipynb --output-dir docs/reportes`
+  deja `docs/reportes/01_eda.html` con todas las gráficas (plotly.js desde CDN).
+- **PDF:** abrir ese HTML en el navegador e imprimir → "Guardar como PDF". `nbconvert --to pdf`
+  requiere LaTeX y `--to webpdf` requiere Chromium; ninguno se instala en el proyecto.
