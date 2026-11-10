@@ -312,7 +312,7 @@
       "dags/diario.py",
       "docker/airflow.Dockerfile"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T4",

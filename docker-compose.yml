@@ -8,6 +8,8 @@
 # Fecha de creación: 2026-11-08
 # Cambios:
 #     - 2026-11-08 · Isacc Cabrera · Creación desde el blueprint con imágenes fijadas.
+#     - 2026-11-10 · Isacc Cabrera · airflow corre como 10001:0 (mismo uid que el recolector) para
+#       poder escribir station_information en bronze (paso 9).
 
 name: radar-ecobici
 
@@ -139,6 +141,9 @@ services:
       context: .
       dockerfile: docker/airflow.Dockerfile
     image: radar-ecobici/airflow:local
+    # Mismo uid que el usuario radar del recolector (dueño de data/bronze); la imagen de Airflow
+    # admite cualquier uid si el grupo es 0 (root).
+    user: "10001:0"
     command: ["standalone"]
     env_file: [.env]
     environment:
