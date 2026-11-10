@@ -31,7 +31,7 @@
       "docs/arquitectura.md",
       "docs/metrics.md"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T2",
@@ -61,7 +61,7 @@
       "src/radar/collector/hashing.py",
       "tests/unit/test_recolector_nucleo.py"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T3",
@@ -96,7 +96,7 @@
       "docker/collector.Dockerfile",
       "tests/unit/test_runner.py"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T4",
@@ -130,7 +130,7 @@
       "src/radar/collector/sinks.py",
       "tests/unit/test_messages.py"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T5",
@@ -165,7 +165,7 @@
       "tests/unit/test_consumer.py",
       "docs/kafka.md"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T6",
@@ -201,7 +201,7 @@
       "scripts/sync_lake.py",
       "tests/unit/test_store.py"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T1",
@@ -234,7 +234,7 @@
       "tests/unit/test_quality.py",
       "tests/unit/test_bronze_to_silver.py"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T2",
@@ -274,7 +274,7 @@
       "sql/analitica.sql",
       "docs/data-lake.md"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T3",
