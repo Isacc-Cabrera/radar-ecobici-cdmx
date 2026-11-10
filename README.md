@@ -1,5 +1,7 @@
 # Radar ECOBICI CDMX
 
+![CI](https://github.com/Isacc-Cabrera/radar-ecobici-cdmx/actions/workflows/ci.yml/badge.svg)
+
 > Pipeline de datos en tiempo real sobre el feed público GBFS de ECOBICI CDMX, predicción de
 > bicis disponibles por estación en la próxima hora, API y mapa 3D de la ciudad.
 
@@ -25,7 +27,9 @@ que nadie valida.
 
 ## Arquitectura
 
-Diagrama y explicación por capa en [docs/arquitectura.md](docs/arquitectura.md).
+Diagrama y explicación por capa en [docs/arquitectura.md](docs/arquitectura.md). La API está
+documentada en [docs/backend.md](docs/backend.md) y la operación ante fallas en
+[docs/runbook.md](docs/runbook.md).
 
 ```text
 GBFS → recolector → Kafka → bronze → silver → gold → modelo (MLflow) → API → mapa 3D

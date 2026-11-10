@@ -1,0 +1,63 @@
+# Autor: Isacc Cabrera
+# Descripción: Integración continua. En cada push y pull request, una máquina limpia instala
+#   exactamente lo de uv.lock y corre lint, formato, tipos y pruebas (job python), y en paralelo
+#   construye las imágenes del recolector y de la API sin publicarlas (job docker, push: false).
+#   Sin secretos ni red hacia AWS: las pruebas usan fixtures, respx y fakes, nunca data/.
+# Patrón: N/A (pipeline declarativo)
+# Fecha de creación: 2026-11-11
+# Cambios:
+#     - 2026-11-11 · Isacc Cabrera · Creación (paso 13).
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Lint, tipos y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: "0.13.7"
+      - name: Instalar dependencias (exactas de uv.lock)
+        run: uv sync --frozen --all-extras --all-groups
+      - name: Lint
+        run: uv run ruff check .
+      - name: Formato
+        run: uv run ruff format --check .
+      - name: Tipos
+        run: uv run mypy
+      - name: Pruebas con cobertura
+        run: uv run pytest --cov=radar --cov-report=term-missing
+
+  docker:
+    name: Imágenes Docker (sin publicar)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Imagen del recolector
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/collector.Dockerfile
+          push: false
+          tags: radar-ecobici/collector:ci
+      - name: Imagen de la API
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: false
+          tags: radar-ecobici/api:ci
