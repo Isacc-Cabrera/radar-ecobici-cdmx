@@ -411,7 +411,7 @@
       "src/radar/api/main.py",
       "tests/integration/test_api.py"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T1",
