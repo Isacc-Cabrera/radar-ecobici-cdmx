@@ -9,11 +9,13 @@
  * Fecha de creación: 2026-11-11
  * Cambios:
  *     - 2026-11-11 · Isacc Cabrera · Creación (paso 14).
+ *     - 2026-11-11 · Isacc Cabrera · "⚠ Anomalía" en la leyenda, la lista y el detalle (paso 15).
  */
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { HistoryState, Station } from "../hooks";
 import {
+  ANOMALY_COLOR,
   BASEMAP_ATTRIBUTION,
   BIKE_RAMP,
   PREDICTION_COLORS,
@@ -69,6 +71,12 @@ function Legend() {
             {PREDICTION_LABELS[c].label}
           </li>
         ))}
+        <li>
+          <span className="swatch" style={{ color: ANOMALY_COLOR }} aria-hidden="true">
+            ⚠
+          </span>
+          Anomalía
+        </li>
       </ul>
     </section>
   );
@@ -111,6 +119,14 @@ function Detail({ station, history, theme }: { station: Station; history: Histor
           "Sin predicción para esta estación."
         )}
       </p>
+      {station.anomalia && (
+        <p>
+          <span style={{ color: ANOMALY_COLOR }} aria-hidden="true">
+            ⚠
+          </span>{" "}
+          Anomalía detectada en esta estación.
+        </p>
+      )}
       <h3>Bicis en las últimas 6 horas</h3>
       {history.loading && <p className="muted">Cargando historia…</p>}
       {history.error && <p className="error">No se pudo cargar la historia: {history.error}</p>}
@@ -208,6 +224,15 @@ export default function Panel({
                           {PREDICTION_LABELS[clase].icon}
                         </span>
                         <span className="sr-only">{PREDICTION_LABELS[clase].label}</span>
+                      </>
+                    )}
+                    {s.anomalia && (
+                      <>
+                        {" "}
+                        <span style={{ color: ANOMALY_COLOR }} aria-hidden="true">
+                          ⚠
+                        </span>
+                        <span className="sr-only">Anomalía</span>
                       </>
                     )}
                   </span>

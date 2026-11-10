@@ -6,13 +6,16 @@
  *   con el tema. Al seleccionar una estación la cámara vuela hacia ella con FlyToInterpolator
  *   (1200 ms, o 0 si el usuario pidió reducir el movimiento). Solo recibe props. El worker de
  *   MapLibre se registra con setWorkerUrl para que funcione en dev y en el build de Vite.
+ *   Las estaciones con anomalía llevan un anillo ANOMALY_COLOR en la base (ScatterplotLayer) y
+ *   "⚠ Anomalía" en el tooltip (texto, no solo color).
  * Patrón: Container/Presentational (presentacional)
  * Fecha de creación: 2026-11-11
  * Cambios:
  *     - 2026-11-11 · Isacc Cabrera · Creación (paso 14).
+ *     - 2026-11-11 · Isacc Cabrera · Anillo y tooltip de anomalías (paso 15).
  */
 import { FlyToInterpolator, type MapViewState, type PickingInfo } from "@deck.gl/core";
-import { ColumnLayer } from "@deck.gl/layers";
+import { ColumnLayer, ScatterplotLayer } from "@deck.gl/layers";
 import DeckGL from "@deck.gl/react";
 import { setWorkerUrl } from "maplibre-gl";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
@@ -20,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Map as BaseMap } from "react-map-gl/maplibre";
 import type { Station } from "../hooks";
 import {
+  ANOMALY_COLOR,
   BASEMAPS,
   PREDICTION_COLORS,
   PREDICTION_LABELS,
@@ -43,6 +47,7 @@ export const INITIAL_VIEW: MapViewState = {
 };
 const FLY_MS = 1200;
 const SELECTED_ZOOM = 15;
+const ANOMALY_RGB = hexToRgb(ANOMALY_COLOR);
 
 interface StationMapProps {
   stations: Station[];
@@ -70,6 +75,7 @@ function tooltip(info: PickingInfo<Station>) {
     pred
       ? `En 1 h: ${pred.prediccion_t60.toFixed(1)} bicis · ${PREDICTION_LABELS[pred.clase].icon} ${PREDICTION_LABELS[pred.clase].label}`
       : "Sin predicción",
+    ...(s.anomalia ? ["⚠ Anomalía (ver /anomalies)"] : []),
   ];
   return {
     html: lines.join("<br/>"),
@@ -112,6 +118,18 @@ export default function StationMap({
 
   const layers = useMemo(
     () => [
+      new ScatterplotLayer<Station>({
+        id: "anomalias",
+        data: stations.filter((s) => s.anomalia),
+        getPosition: (s) => [s.lon, s.lat],
+        getRadius: 90,
+        radiusUnits: "meters",
+        stroked: true,
+        filled: false,
+        getLineColor: ANOMALY_RGB,
+        lineWidthMinPixels: 3,
+        pickable: false,
+      }),
       new ColumnLayer<Station>({
         id: "estaciones",
         data: stations,

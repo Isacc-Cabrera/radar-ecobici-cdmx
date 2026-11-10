@@ -8,10 +8,13 @@ Descripción: Repositorio de estaciones para la API. Esconde que los datos son P
     no el reloj: si el recolector se detuvo, la API responde con lo último que vio y /health
     reporta la antigüedad. La rejilla de inferencia se ancla en el último dato (grid_at): así
     bicis_actuales coincide con /stations. Cachea cada lectura 30 s (reloj inyectable).
+    anomalies() corre los detectores de radar.anomalies (caché 60 s) y stations() marca
+    anomalia=True exactamente en esas estaciones.
 Patrón: Repository
 Fecha de creación: 2026-11-10
 Cambios:
     - 2026-11-10 · Isacc Cabrera · Creación (paso 12).
+    - 2026-11-11 · Isacc Cabrera · anomalies() con los tres detectores y caché de 60 s (paso 15).
 """
 
 import re
@@ -26,12 +29,16 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from radar.anomalies.detectors import AnomalyDetector, make_detectors, run_all
 from radar.api.schemas import AnomalyOut, HistoryPointOut, StationOut
+from radar.config import get_settings
 from radar.lake.bronze_to_silver import SILVER_STATUS_SCHEMA
 from radar.lake.silver_to_gold import FEATURES_BASE_SCHEMA, GRID
 from radar.ml.features import build_inference_frame, demand_by_station
 
 CACHE_SECONDS = 30.0
+ANOMALY_CACHE_SECONDS = 60.0
+HISTORY_COLUMNS = ["station_id", "ts_utc", "bikes_available", "capacity"]
 RECENT_HOURS = 2  # horas silver para el estado actual y el marco de inferencia (lags de 60 min)
 GRID_STEPS = 24  # 2 h de rejilla: cubre lag_60 y roll_mean_60
 MAX_HISTORY_HOURS = 24
@@ -105,16 +112,22 @@ class StationRepository:
         clock: Reloj monotónico para la caché (inyectable en pruebas).
     """
 
-    def __init__(self, data_dir: Path, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(
+        self,
+        data_dir: Path,
+        clock: Callable[[], float] = time.monotonic,
+        detectors: list[AnomalyDetector] | None = None,
+    ) -> None:
         self.data_dir = data_dir
         self._clock = clock
         self._cache: dict[tuple[Any, ...], tuple[float, Any]] = {}
+        self._detectors = detectors
 
     # --- caché ---------------------------------------------------------------------------------
-    def _cached(self, key: tuple[Any, ...], load: Callable[[], T]) -> T:
+    def _cached(self, key: tuple[Any, ...], load: Callable[[], T], ttl: float = CACHE_SECONDS) -> T:
         now = self._clock()
         hit = self._cache.get(key)
-        if hit is not None and now - hit[0] < CACHE_SECONDS:
+        if hit is not None and now - hit[0] < ttl:
             value: T = hit[1]
             return value
         value = load()
@@ -290,5 +303,42 @@ class StationRepository:
         return round(((now or datetime.now(UTC)) - ref).total_seconds(), 1)
 
     def anomalies(self) -> list[AnomalyOut]:
-        """Anomalías actuales: vacía hasta el paso 15."""
-        return []
+        """Anomalías vigentes en el último dato, de los tres detectores (caché 60 s).
+
+        Una estación puede aparecer una vez por cada detector que la marque. Sin silver
+        devuelve ``[]`` (no hay nada que evaluar).
+        """
+
+        def load() -> list[AnomalyOut]:
+            try:
+                obs = self._silver(RECENT_HOURS)
+            except DataUnavailableError:
+                return []
+            recent = obs.select(
+                "station_id",
+                "snapshot_last_updated",
+                "last_reported",
+                "num_bikes_available",
+                "capacity",
+            ).to_pandas()
+            base = self.data_dir / "gold" / "features_base"
+            history = (
+                pd.read_parquet(base, columns=HISTORY_COLUMNS)
+                if base.exists()
+                else pd.DataFrame(columns=HISTORY_COLUMNS)
+            )
+            now = obs["snapshot_last_updated"].max()
+            assert isinstance(now, datetime)
+            detectors = self._detectors or make_detectors(get_settings())
+            return [
+                AnomalyOut(
+                    station_id=a.station_id,
+                    tipo=a.tipo,
+                    puntaje=a.puntaje,
+                    detalle=a.detalle,
+                    detectado_utc=a.detectado_utc,
+                )
+                for a in run_all(detectors, recent, history, now)
+            ]
+
+        return self._cached(("anomalies",), load, ttl=ANOMALY_CACHE_SECONDS)
