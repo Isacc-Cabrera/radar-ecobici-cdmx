@@ -559,7 +559,7 @@
       "scripts/sync_gold_to_s3.sh",
       "docs/nube.md"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T5",
