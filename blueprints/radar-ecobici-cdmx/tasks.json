@@ -593,7 +593,7 @@
       "tests/unit/test_rag.py",
       "docs/rag.md"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T6",
