@@ -7,6 +7,7 @@
 # Fecha de creación: 2026-11-11
 # Cambios:
 #     - 2026-11-11 · Isacc Cabrera · Creación (paso 13).
+#     - 2026-11-11 · Isacc Cabrera · setup-uv fijado a v10.3.3 (no existe la etiqueta v10).
 name: CI
 
 on: [push, pull_request]
@@ -27,7 +28,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3  # setup-uv no publica la etiqueta móvil v10
         with:
           version: "0.13.7"
       - name: Instalar dependencias (exactas de uv.lock)
